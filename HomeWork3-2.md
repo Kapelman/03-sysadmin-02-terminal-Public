@@ -195,6 +195,33 @@ drwx------ 2 vagrant root    4096 Jan  8 16:37 .ssh
 -rw-r--r-- 1 root    root     180 Dec 19 19:44 .wget-hsts
 
 ```
+Вариант использования более простой нотации:
+- Создаем файлы
+```
+vagrant@vagrant:~$ touch 1.txt 2.txt
+vagrant@vagrant:~$ ls -al
+total 84
+drwxr-xr-x 6 vagrant vagrant  4096 Jan 30 18:49 .
+drwxr-xr-x 3 root    root     4096 Dec 19 19:42 ..
+-rw-rw-r-- 1 vagrant vagrant     0 Jan 30 18:49 1.txt
+-rw-rw-r-- 1 vagrant vagrant     0 Jan 30 18:49 2.txt
+```
+- Записываем в файл  строку 'ls -al'
+```
+vagrant@vagrant:~$ echo ls -al >1.txt
+vagrant@vagrant:~$ ls -al
+total 88
+drwxr-xr-x 6 vagrant vagrant  4096 Jan 30 18:49 .
+drwxr-xr-x 3 root    root     4096 Dec 19 19:42 ..
+-rw-rw-r-- 1 vagrant vagrant     7 Jan 30 18:52 1.txt
+-rw-rw-r-- 1 vagrant vagrant     0 Jan 30 18:49 2.txt
+```
+- Используем 1.txt как stdin и 2.txt как stdout
+```
+vagrant@vagrant:~$ cat <1.txt >2.txt
+vagrant@vagrant:~$ cat 2.txt
+ls -al
+```
 6. Получится ли находясь в графическом режиме, вывести данные из PTY в какой-либо из эмуляторов TTY? 
 Сможете ли вы наблюдать выводимые данные?
 Непонятный вопрос. Не могу это смоделировать на своей машине. Нет Windows X.
@@ -204,9 +231,13 @@ drwx------ 2 vagrant root    4096 Jan  8 16:37 .ssh
 8. Выполните команду bash 5>&1. К чему она приведет? Что будет, если вы выполните echo netology > /proc/$$/fd/5? 
 Почему так происходит?
 
-При выполнении команды 5>&1 создается новый файловый дескриптор со значением 5 и перенаправление выходного потока с 
+~~При выполнении команды 5>&1 создается новый файловый дескриптор со значением 5 и перенаправление выходного потока с 
 данного дескриптора на страдартный вывод, т.е. дескриптор 1. 
-Поэтому результат команды echo netology > /proc/$$/fd/5 появляется на экране.
+Поэтому результат команды echo netology > /proc/$$/fd/5 появляется на экране.~~
+
+При выполнении команды 5>&1 создается файловый дискриптор 5 аналогичный файловому дискриптору 1 (stdout),
+т.е. FD 5 ссылается на файл терминала аналогично FD 1, при перенаправлении вывода на FD 5 
+в команде `/dev/pts$ echo netology > /proc/$$/fd/5` мы увидим "netology" на экране терминал 
 ```
 vagrant@vagrant:/dev/pts$ lsof -p $$
 COMMAND   PID    USER   FD   TYPE DEVICE SIZE/OFF    NODE NAME
