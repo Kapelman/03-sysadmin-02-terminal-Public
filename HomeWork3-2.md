@@ -226,9 +226,9 @@ ls -al
 Сможете ли вы наблюдать выводимые данные?
 Непонятный вопрос. Не могу это смоделировать на своей машине. Нет Windows X.
 Теоретически такой процесс возможен, т.к. есть пара   slave - master, почему бы не направить вывод master на TTY
-Устройство dev/ptmx так и не смог запустить у себя с системе.
+Устройство dev/ptmx так и не смог запустить у себя в системе.
 
-8. Выполните команду bash 5>&1. К чему она приведет? Что будет, если вы выполните echo netology > /proc/$$/fd/5? 
+7. Выполните команду bash 5>&1. К чему она приведет? Что будет, если вы выполните echo netology > /proc/$$/fd/5? 
 Почему так происходит?
 
 
@@ -252,32 +252,56 @@ vagrant@vagrant:/dev/pts$ echo netology > /proc/$$/fd/5
 netology
 ```
 
-
-9. Получится ли в качестве входного потока для pipe использовать только stderr команды, 
+8. Получится ли в качестве входного потока для pipe использовать только stderr команды, 
 не потеряв при этом отображение stdout на pty? Напоминаем: по умолчанию через pipe передается только stdout команды слева 
 от | на stdin команды справа. Это можно сделать, поменяв стандартные потоки 
 местами через промежуточный новый дескриптор, который вы научились создавать в предыдущем вопросе.
 
+Решение: 
 Получится, можно перенаправить поток ошибок в поток вывода.
-Дополнительных дескрипторов не нужно.
+Сделаем так, чтобы FD 1 писал в файл 2.txt, а стандартный поток ошибок записывал в stdout
+Поменяем местами потоки, использую дополнительный файловы дискритор и попробуем запустить команду
+ls для несуществующей директории.
 
-Деректория кккк не существует.
-Укажем ее в командах ls | grep, grep найдет слово cannot
+ - Видим что команда grep отработала и нашла в stdout строчку с ошибокой
 ```
-vagrant@vagrant:/dev$ ls -al  kkkk 2>&1 |grep cannot -c
-1
-vagrant@vagrant:/dev$ ls -al kkkk | grep cannot
-ls: cannot access 'kkkk': No such file or directory
+vagrant@vagrant:~$ ls -al kkk 2>2.txt 3>&1 1>&2 2>&3 | grep -n 'such'
+1:ls: cannot access 'kkk': No such file or directory
 ```
-Уберем некорректную деректорию и далее поищем слово root. Видно, что отображение stdout на pty не потеряно.
+- файл 2.txt пустой, т.к. на FD 1 не выводилось информации.
 ```
-vagrant@vagrant:/dev$ ls -al  2>&1 |grep cannot -c
-0
-vagrant@vagrant:/dev$ ls -al  2>&1 |grep root -c
-197
+vagrant@vagrant:~$ ls -al
+total 83072
+drwxr-xr-x 8 vagrant vagrant     4096 Feb 13 19:25  .
+drwxr-xr-x 3 root    root        4096 Dec 19 19:42  ..
+-rw-rw-r-- 1 vagrant vagrant        0 Feb 13 19:26  2.txt
 ```
 
-10. Что выведет команда cat /proc/$$/environ? Как еще можно получить аналогичный по содержанию вывод?
+- сделаем вызов ls теперь без ошибки, увидим что команда grep не нашла сообщений об ошибке, зато файл 2.txt 
+стал содержать результат работы комнады.
+
+```
+vagrant@vagrant:~$ ls -al 2>2.txt 3>&1 1>&2 2>&3 | grep -n 'such'
+vagrant@vagrant:~$ ls -al
+total 83076
+drwxr-xr-x 8 vagrant vagrant     4096 Feb 13 19:25  .
+drwxr-xr-x 3 root    root        4096 Dec 19 19:42  ..
+-rw-rw-r-- 1 vagrant vagrant     1624 Feb 13 19:27  2.txt
+```
+```
+vagrant@vagrant:~$ cat 2.txt
+total 83072
+drwxr-xr-x 8 vagrant vagrant     4096 Feb 13 19:25 .
+drwxr-xr-x 3 root    root        4096 Dec 19 19:42 ..
+-rw-rw-r-- 1 vagrant vagrant        0 Feb 13 19:27 2.txt
+-rw-r--r-- 1 vagrant vagrant      220 Feb 25  2020 .bash_logout
+-rw-r--r-- 1 vagrant vagrant     3771 Feb 25  2020 .bashrc
+drwx------ 2 vagrant vagrant     4096 Dec 19 19:42 .cache
+drwx------ 3 vagrant vagrant     4096 Jan 18 20:36 .config
+```
+
+
+9. Что выведет команда cat /proc/$$/environ? Как еще можно получить аналогичный по содержанию вывод?
 Команда cat /proc/$$/environ
 
 Применим команду printenv, она показывает переменные окружения или их часть.
@@ -309,7 +333,48 @@ SSH_TTY=/dev/pts/0
 OLDPWD=/etc
 _=/usr/bin/printenv
 ```
-11. Узнайте, какую наиболее старшую версию набора инструкций SSE поддерживает ваш процессор с помощью /proc/cpuinfo.
+
+10. Используя man, опишите что доступно по адресам /proc/<PID>/cmdline, /proc/<PID>/exe.
+
+Использую команду  man proc находим 
+
+- /proc/[pid]/cmdline полную командную сторку для процесса пока тот не ЗОМБИ
+
+
+```
+    /proc/[pid]/cmdline
+              This read-only file holds the complete command line for the process, unless the process is a zombie.  In the latter case, there is nothing in this file: that is, a read on  this  file  will
+              return 0 characters.  The command-line arguments appear in this file as a set of strings separated by null bytes ('\0'), with a further null byte after the last string.
+```
+На примере запущенного процессора Python
+
+```
+vagrant@vagrant:/usr/share/man/man4$ cat /proc/1558/cmdline
+/usr/bin/python3/usr/lib/netdata/plugins.d/python.d.plugin1
+```
+- /proc/[pid]/exe - ссылка на актуальный путь фаловый путь выполняемой команды. Можно открыть и увидеть содержимое, можно запустить, набирая
+/proc/[pid]/exe и получить еще одну копию процесса.
+
+```
+ /proc/[pid]/exe
+              Under  Linux 2.2 and later, this file is a symbolic link containing the actual pathname of the executed command.  This symbolic link can be dereferenced normally; attempting to open it will
+              open the executable.  You can even type /proc/[pid]/exe to run another copy of the same executable that is being run by process [pid].  If the pathname has been unlinked, the symbolic  link
+              will  contain the string '(deleted)' appended to the original pathname.  In a multithreaded process, the contents of this symbolic link are not available if the main thread has already ter‐
+              minated (typically by calling pthread_exit(3)).
+
+              Permission to dereference or read (readlink(2)) this symbolic link is governed by a ptrace access mode PTRACE_MODE_READ_FSCREDS check; see ptrace(2).
+
+              Under Linux 2.0 and earlier, /proc/[pid]/exe is a pointer to the binary which was executed, and appears as a symbolic link.  A readlink(2) call on this file under Linux 2.0 returns a string
+              in the format:
+
+                  [device]:inode
+
+              For example, [0301]:1502 would be inode 1502 on device major 03 (IDE, MFM, etc. drives) minor 01 (first partition on the first drive).
+
+              find(1) with the -inum option can be used to locate the file.
+```
+
+12. Узнайте, какую наиболее старшую версию набора инструкций SSE поддерживает ваш процессор с помощью /proc/cpuinfo.
 
 Командой cat /proc/cpuinfo | grep sse находим sse4_2
 ```
